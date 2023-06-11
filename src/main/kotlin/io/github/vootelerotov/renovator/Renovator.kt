@@ -64,7 +64,7 @@ class Renovator : CliktCommand() {
       }.also { echo("Found ${it.size} renovate PR-s for dependency $dependency") }
     } ?: renovatePrs
 
-    matchingPrs.forEach { prIssue ->
+    matchingPrs.sortedBy { it.title() }.forEach { prIssue ->
       val pullRequestClient = pullRequestClient(prIssue, githubClient)
       pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let { merge(it, pullRequestClient) }
     }
