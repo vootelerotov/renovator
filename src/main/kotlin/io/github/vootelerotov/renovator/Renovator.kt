@@ -104,6 +104,7 @@ class Renovator : CliktCommand() {
       pr.number()!!,
       ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).sha(pr.head()?.sha()!!).build()
     ).get()
+    echo("")
   }
 
   private fun pullRequestClient(pr: SearchIssue, githubClient: GitHubClient): PullRequestClient {
