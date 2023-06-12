@@ -1,10 +1,13 @@
 package io.github.vootelerotov.renovator
 
 import com.github.ajalt.clikt.core.CliktCommand
+import com.github.ajalt.clikt.parameters.groups.OptionGroup
+import com.github.ajalt.clikt.parameters.groups.cooccurring
 import com.github.ajalt.clikt.parameters.groups.mutuallyExclusiveOptions
 import com.github.ajalt.clikt.parameters.groups.required
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.spotify.github.v3.clients.GitHubClient
@@ -39,7 +42,8 @@ class Renovator : CliktCommand() {
 
   private val author by option("-a", "--author", help = "The creator of renovate request").default(RENOVATE_APP)
 
-  private val dependency by option("-d", "--dependency", help = "The dependency to renovate")
+
+  private val dependencyFilterOptions by DependencyFilterOptions().cooccurring()
 
   private val defaultComment by option("-m", "--comment", help = "The default comment for PR approvals")
 
@@ -58,7 +62,7 @@ class Renovator : CliktCommand() {
 
     echo("Found ${renovatePrs.size} renovate PR-s for user $user")
 
-    val matchingPrs = dependency?.let { dependency ->
+    val matchingPrs = dependencyFilterOptions?.dependency?.let { dependency ->
       renovatePrs.filter {
         it.title()?.contains(dependency) ?: false
       }.also { echo("Found ${it.size} renovate PR-s for dependency $dependency") }
@@ -66,12 +70,14 @@ class Renovator : CliktCommand() {
 
     matchingPrs.sortedBy { it.title() }.forEach { prIssue ->
       val pullRequestClient = pullRequestClient(prIssue, githubClient)
-      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let { merge(it, pullRequestClient) }
+      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let {
+        merge(it, pullRequestClient, dependencyFilterOptions?.yes ?: false)
+      }
     }
 
   }
 
-  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient) {
+  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient, confirmedViaFlag: Boolean = false) {
     if (pr.merged() != false) {
       echo("PR ${prDescription(pr)} is already merged")
       return
@@ -82,7 +88,7 @@ class Renovator : CliktCommand() {
       return
     }
 
-    val isConfirmed = confirm("Approve and merge PR ${prDescription(pr)}?")
+    val isConfirmed = confirmedViaFlag || confirm("Approve and merge PR ${prDescription(pr)}?")
       ?: throw IllegalStateException("Can not get confirmation from stdin")
 
     if (!isConfirmed) {
@@ -125,6 +131,11 @@ class Renovator : CliktCommand() {
       httpClient.connectionPool().evictAll()
       httpClient.cache()?.close()
     }
+  }
+
+  class DependencyFilterOptions: OptionGroup() {
+    val dependency by option("-d", "--dependency", help = "The dependency to renovate").required()
+    val yes by option("-y", "--yes", help = "Approve all matching PR-s").flag()
   }
 
 }
