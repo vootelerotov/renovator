@@ -102,7 +102,7 @@ class Renovator : CliktCommand() {
     echo("Merging PR ${prDescription(pr)} via re-base")
     pullRequestClient.merge(
       pr.number()!!,
-      ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).build()
+      ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).sha(pr.head()?.sha()!!).build()
     ).get()
   }
 
