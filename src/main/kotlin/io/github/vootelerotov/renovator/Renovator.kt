@@ -42,8 +42,10 @@ class Renovator : CliktCommand() {
 
   private val author by option("-a", "--author", help = "The creator of renovate request").default(RENOVATE_APP)
 
-
-  private val dependencyFilterOptions by DependencyFilterOptions().cooccurring()
+  private val dependencyFilterOptions by object : OptionGroup() {
+    val dependency by option("-d", "--dependency", help = "The dependency to renovate").required()
+    val yes by option("-y", "--yes", help = "Approve all matching PR-s").flag()
+  }.cooccurring()
 
   private val defaultComment by option("-m", "--comment", help = "The default comment for PR approvals")
 
@@ -131,11 +133,6 @@ class Renovator : CliktCommand() {
       httpClient.connectionPool().evictAll()
       httpClient.cache()?.close()
     }
-  }
-
-  class DependencyFilterOptions: OptionGroup() {
-    val dependency by option("-d", "--dependency", help = "The dependency to renovate").required()
-    val yes by option("-y", "--yes", help = "Approve all matching PR-s").flag()
   }
 
 }
