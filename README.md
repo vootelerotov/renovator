@@ -12,6 +12,10 @@ Renovator helps to keep them under control by merging them semi-automatically.
 
 A CLI tool that you can run, that lists all the open PR-s in your repositories, and you can select which ones to merge.
 
+## What you need
+
+A Github token, with full repo rights.
+
 ## Usage
 
 ```bash
