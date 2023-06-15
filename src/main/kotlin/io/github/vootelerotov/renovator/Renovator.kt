@@ -97,7 +97,7 @@ class Renovator : CliktCommand() {
       return
     }
 
-    val comment = prompt("Enter comment to approve the PR with", default = defaultComment)
+    val comment = prompt("Enter comment to approve the PR with: ", default = defaultComment, promptSuffix = "")
       ?: throw IllegalStateException("Can not get comment from stdin")
 
     echo("Approving PR ${prDescription(pr)} with comment $comment")
