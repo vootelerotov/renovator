@@ -122,7 +122,7 @@ class Renovator : CliktCommand() {
     return githubClient.createRepositoryClient(org, name).createPullRequestClient()
   }
 
-  private fun prDescription(it: PullRequest) = "[title: ${it.title()}, url: ${it.htmlUrl()}]"
+  private fun prDescription(it: PullRequest) = "[title: ${it.title()}, url: ${it.htmlUrl()} ]"
 
   private fun withHttpClient(task: (OkHttpClient) -> Unit) {
     val httpClient = OkHttpClient()
