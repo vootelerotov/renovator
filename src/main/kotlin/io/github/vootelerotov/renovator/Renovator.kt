@@ -89,8 +89,7 @@ class Renovator : CliktCommand() {
       return
     }
 
-    val isConfirmed = confirmedViaFlag || confirm("Approve and merge PR ${prDescription(pr)}?")
-      ?: throw IllegalStateException("Can not get confirmation from stdin")
+    val isConfirmed = confirmedViaFlag || confirmMerge(pr)
 
     if (!isConfirmed) {
       return
@@ -122,6 +121,26 @@ class Renovator : CliktCommand() {
     echo("")
   }
 
+  private fun confirmMerge(pr: PullRequest): Boolean {
+    val input = prompt(
+      "Approve and merge PR ${prDescription(pr)} [y/N]? You can also type 'i' to get more information about the PR.",
+      default = "N",
+      showDefault = false
+    )
+
+    return if ("i".equals(input, ignoreCase = true)) {
+      echo("""
+        
+        Title: ${pr.title()}
+        URL: ${pr.url()}
+        
+      """.trimIndent())
+      confirmMerge(pr)
+    } else {
+      "y".equals(input, ignoreCase = true)
+    }
+  }
+
   private fun pullRequestClient(pr: SearchIssue, githubClient: GitHubClient): PullRequestClient {
     val (org, name) = pr.repositoryUrl()?.getOrNull()?.path?.let { path ->
       path.substringAfter("/repos/").split("/")
@@ -134,7 +153,15 @@ class Renovator : CliktCommand() {
     val depName = split.getOrNull(0)?.substringAfter("Update dependency ")?.substringAfterLast(":")
       ?: throw IllegalStateException("Missing title")
     val version = split.getOrNull(1) ?: throw IllegalStateException("Missing version")
-    return "$depName to $version"
+    val repository = it.url().toString().substringAfter("sympower/").substringBefore("/")
+    return """
+      
+        Dependency: $depName
+        Version: $version
+        Repository: $repository
+      
+    """.trimIndent()
+
   }
 
   private fun withHttpClient(task: (OkHttpClient) -> Unit) {
