@@ -19,7 +19,6 @@ import com.spotify.github.v3.prs.PullRequest
 import com.spotify.github.v3.search.SearchIssue
 import com.spotify.github.v3.search.requests.ImmutableSearchParameters
 import com.spotify.githubclient.shade.okhttp3.OkHttpClient
-import java.lang.IllegalStateException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.jvm.optionals.getOrNull
@@ -122,7 +121,13 @@ class Renovator : CliktCommand() {
     return githubClient.createRepositoryClient(org, name).createPullRequestClient()
   }
 
-  private fun prDescription(it: PullRequest) = "[title: ${it.title()}, url: ${it.htmlUrl()} ]"
+  private fun prDescription(it: PullRequest): String {
+    val split = it.title()?.split(" to ").orEmpty()
+    val depName = split.getOrNull(0)?.substringAfter("Update dependency ")?.substringAfterLast(":")
+      ?: throw IllegalStateException("Missing title")
+    val version = split.getOrNull(1) ?: throw IllegalStateException("Missing version")
+    return "$depName to $version"
+  }
 
   private fun withHttpClient(task: (OkHttpClient) -> Unit) {
     val httpClient = OkHttpClient()
