@@ -80,12 +80,12 @@ class Renovator : CliktCommand() {
 
   private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient, confirmedViaFlag: Boolean = false) {
     if (pr.merged() != false) {
-      echo("PR ${prDescription(pr)} is already merged")
+      echo("PR with ${prDescriptionShort(pr)} is already merged")
       return
     }
 
     if (pr.mergeable().getOrNull() != true) {
-      echo("PR ${prDescription(pr)} cannot be merged")
+      echo("PR with ${prDescriptionShort(pr)} cannot be merged")
       return
     }
 
@@ -106,14 +106,14 @@ class Renovator : CliktCommand() {
     }
       ?: throw IllegalStateException("Can not get comment from stdin")
 
-    echo("Approving PR ${prDescription(pr)} with comment $comment")
+    echo("Approving PR ${pr.title()} with comment $comment")
 
     pullRequestClient.createReview(pr.number()!!, ImmutableReviewParameters.builder()
       .body(comment)
       .event(APPROVE_EVENT)
       .build()
     ).get()
-    echo("Merging PR ${prDescription(pr)} via re-base")
+    echo("Merging PR ${pr.title()} via re-base")
     pullRequestClient.merge(
       pr.number()!!,
       ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).sha(pr.head()?.sha()!!).build()
@@ -123,7 +123,7 @@ class Renovator : CliktCommand() {
 
   private fun confirmMerge(pr: PullRequest): Boolean {
     val input = prompt(
-      "Approve and merge PR ${prDescription(pr)} [y/N]? You can also type 'i' to get more information about the PR.",
+      "Approve and merge following PR [y/N]? Type 'i' to get more information about the PR. ${prDescriptionLong(pr)}",
       default = "N",
       showDefault = false
     )
@@ -148,20 +148,21 @@ class Renovator : CliktCommand() {
     return githubClient.createRepositoryClient(org, name).createPullRequestClient()
   }
 
-  private fun prDescription(it: PullRequest): String {
+  private fun prDescriptionShort(it: PullRequest): String {
+    return "title: ${it.title()}, url: ${it.htmlUrl()}"
+  }
+
+  private fun prDescriptionLong(it: PullRequest): String {
     val split = it.title()?.split(" to ").orEmpty()
     val depName = split.getOrNull(0)?.substringAfter("Update dependency ")?.substringAfterLast(":")
       ?: throw IllegalStateException("Missing title")
     val version = split.getOrNull(1) ?: throw IllegalStateException("Missing version")
     val repository = it.url().toString().substringAfter("sympower/").substringBefore("/")
-    return """
-      
-        Dependency: $depName
-        Version: $version
-        Repository: $repository
-      
-    """.trimIndent()
-
+    return """ 
+    Dependency: $depName
+    Version: $version
+    Repository: $repository
+    """
   }
 
   private fun withHttpClient(task: (OkHttpClient) -> Unit) {
