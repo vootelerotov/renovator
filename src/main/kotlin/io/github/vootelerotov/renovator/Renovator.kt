@@ -48,7 +48,7 @@ class Renovator : CliktCommand() {
 
   private val debug by option("--debug", help = "Enables additional output").flag()
 
-  private val defaultComment by option("-m", "-c", "--comment", help = "The default comment for PR approvals")
+  private val defaultComment by option("-m", "-c", "--comment", help = "The default comment for PR approvals").default("LGTM")
 
   override fun run() {
     withHttpClient(this::renovate)
@@ -73,14 +73,12 @@ class Renovator : CliktCommand() {
 
     matchingPrs.sortedBy { it.title() }.forEach { prIssue ->
       val pullRequestClient = pullRequestClient(prIssue, githubClient)
-      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let {
-        merge(it, pullRequestClient, dependencyFilterOptions?.yes ?: false)
-      }
+      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let { merge(it, pullRequestClient) }
     }
 
   }
 
-  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient, confirmedViaFlag: Boolean = false) {
+  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient) {
     if (pr.merged() != false) {
       echo("PR ${prDescription(pr)} is already merged")
       return
@@ -91,30 +89,70 @@ class Renovator : CliktCommand() {
       return
     }
 
-    val isConfirmed = confirmedViaFlag || confirm("Approve and merge PR ${prDescription(pr)}?")
-      ?: throw IllegalStateException("Can not get confirmation from stdin")
-
-    if (!isConfirmed) {
-      return
+    when (val confirmation = confirmMerge(pr)) {
+      is Yes -> approveAndMerge(pr, pullRequestClient, confirmation.comment)
+      is No -> debug("Skipping PR ${prDescription(pr)}")
     }
 
-    val comment = prompt("Enter comment to approve the PR with: ", default = defaultComment, promptSuffix = "")
-      ?: throw IllegalStateException("Can not get comment from stdin")
+  }
 
+  private fun approveAndMerge(pr: PullRequest, pullRequestClient: PullRequestClient, comment: String) {
     debug("Approving PR ${prDescription(pr)} with comment $comment")
-
     pullRequestClient.createReview(pr.number()!!, ImmutableReviewParameters.builder()
       .body(comment)
       .event(APPROVE_EVENT)
       .build()
     ).get()
+
     debug("Merging PR ${prDescription(pr)} via re-base")
+
     pullRequestClient.merge(
       pr.number()!!,
       ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).sha(pr.head()?.sha()!!).build()
     ).get()
     echo("")
   }
+
+  private fun confirmMerge(pr: PullRequest): Confirmation =
+    if (dependencyFilterOptions?.yes == true) {
+      Yes(defaultComment)
+    }
+    else {
+      confirmMerge(pr, defaultComment)
+    }
+
+  private fun confirmMerge(pr: PullRequest, comment: String = defaultComment): Confirmation {
+    val input = prompt(
+      "${prDescription(pr)} \n Approve and merge this PR with comment '$comment' [y/N/c/?]",
+      default = "n",
+      showDefault = false
+    ) ?: throw IllegalStateException("Can not get confirmation from stdin")
+
+    return when (input.lowercase()) {
+      "y" -> Yes(comment)
+      "n" -> No
+      "c" -> confirmMerge(pr, promptForComment())
+      "?" -> {
+        showInformation().run {  }
+        confirmMerge(pr, comment)
+      }
+      else -> {
+        echo("Invalid input: $input")
+        confirmMerge(pr, comment)
+      }
+    }
+
+  }
+
+  private fun showInformation() {
+    echo("y - Approve and merge this PR")
+    echo("n - Skip this PR")
+    echo("c - Approve and merge this PR with custom comment")
+    echo("? - Show this help")
+  }
+
+  private fun promptForComment() = prompt("Enter comment to approve the PR with: ", default = defaultComment, promptSuffix = "")
+    ?: throw IllegalStateException("Can not get comment from stdin")
 
   private fun pullRequestClient(pr: SearchIssue, githubClient: GitHubClient): PullRequestClient {
     val (org, name) = pr.repositoryUrl()?.getOrNull()?.path?.let { path ->
@@ -137,5 +175,9 @@ class Renovator : CliktCommand() {
   }
 
   private fun debug(message: String) = takeIf { debug }?.let { echo(message) }
+
+  sealed interface Confirmation
+  data class Yes(val comment: String) : Confirmation
+  object No : Confirmation
 
 }
