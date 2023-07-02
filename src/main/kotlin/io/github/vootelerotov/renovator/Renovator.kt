@@ -46,6 +46,8 @@ class Renovator : CliktCommand() {
     val yes by option("-y", "--yes", help = "Approve all matching PR-s").flag()
   }.cooccurring()
 
+  private val debug by option("--debug", help = "Enables additional output").flag()
+
   private val defaultComment by option("-m", "-c", "--comment", help = "The default comment for PR approvals")
 
   override fun run() {
@@ -99,14 +101,14 @@ class Renovator : CliktCommand() {
     val comment = prompt("Enter comment to approve the PR with: ", default = defaultComment, promptSuffix = "")
       ?: throw IllegalStateException("Can not get comment from stdin")
 
-    echo("Approving PR ${prDescription(pr)} with comment $comment")
+    debug("Approving PR ${prDescription(pr)} with comment $comment")
 
     pullRequestClient.createReview(pr.number()!!, ImmutableReviewParameters.builder()
       .body(comment)
       .event(APPROVE_EVENT)
       .build()
     ).get()
-    echo("Merging PR ${prDescription(pr)} via re-base")
+    debug("Merging PR ${prDescription(pr)} via re-base")
     pullRequestClient.merge(
       pr.number()!!,
       ImmutableMergeParameters.builder().mergeMethod(MergeMethod.rebase).sha(pr.head()?.sha()!!).build()
@@ -133,5 +135,7 @@ class Renovator : CliktCommand() {
       httpClient.cache()?.close()
     }
   }
+
+  private fun debug(message: String) = takeIf { debug }?.let { echo(message) }
 
 }
