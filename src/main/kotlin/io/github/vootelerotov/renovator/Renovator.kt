@@ -19,7 +19,6 @@ import com.spotify.github.v3.prs.PullRequest
 import com.spotify.github.v3.search.SearchIssue
 import com.spotify.github.v3.search.requests.ImmutableSearchParameters
 import com.spotify.githubclient.shade.okhttp3.OkHttpClient
-import java.lang.IllegalStateException
 import java.net.URI
 import java.util.concurrent.TimeUnit
 import kotlin.jvm.optionals.getOrNull
@@ -47,7 +46,7 @@ class Renovator : CliktCommand() {
     val yes by option("-y", "--yes", help = "Approve all matching PR-s").flag()
   }.cooccurring()
 
-  private val defaultComment by option("-m", "--comment", help = "The default comment for PR approvals")
+  private val defaultComment by option("-m", "-c", "--comment", help = "The default comment for PR approvals")
 
   override fun run() {
     withHttpClient(this::renovate)
