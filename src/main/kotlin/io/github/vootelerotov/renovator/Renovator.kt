@@ -10,6 +10,8 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.spotify.github.v3.checks.CheckRunConclusion
+import com.spotify.github.v3.clients.ChecksClient
 import com.spotify.github.v3.clients.GitHubClient
 import com.spotify.github.v3.clients.PullRequestClient
 import com.spotify.github.v3.prs.ImmutableMergeParameters
@@ -73,12 +75,15 @@ class Renovator : CliktCommand() {
 
     matchingPrs.sortedBy { it.title() }.forEach { prIssue ->
       val pullRequestClient = pullRequestClient(prIssue, githubClient)
-      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let { merge(it, pullRequestClient) }
+      val checksClient = checksClient(prIssue.repositoryUrl()?.getOrNull(), githubClient)
+      pullRequestClient.get(prIssue.number()!!).get(5, TimeUnit.SECONDS).let {
+        merge(it, pullRequestClient, checksClient)
+      }
     }
 
   }
 
-  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient) {
+  private fun merge(pr: PullRequest, pullRequestClient: PullRequestClient, checksClient: ChecksClient) {
     if (pr.merged() != false) {
       echo("PR ${prDescription(pr)} is already merged")
       return
@@ -86,6 +91,14 @@ class Renovator : CliktCommand() {
 
     if (pr.mergeable().getOrNull() != true) {
       echo("PR ${prDescription(pr)} cannot be merged")
+      return
+    }
+
+    if (
+      checksClient.getCheckRuns(pr.head()?.ref()).get().checkRuns()
+        .any { it.conclusion().getOrNull() != CheckRunConclusion.success }
+      ) {
+      echo("PR ${prDescription(pr)} has non-succeeded checks")
       return
     }
 
@@ -155,11 +168,17 @@ class Renovator : CliktCommand() {
     ?: throw IllegalStateException("Can not get comment from stdin")
 
   private fun pullRequestClient(pr: SearchIssue, githubClient: GitHubClient): PullRequestClient {
-    val (org, name) = pr.repositoryUrl()?.getOrNull()?.path?.let { path ->
-      path.substringAfter("/repos/").split("/")
-    } ?: throw IllegalStateException("Could not get repository full name from ${pr.repositoryUrl()?.getOrNull()}")
+    val (org, name) = repository(pr.repositoryUrl()?.getOrNull())
     return githubClient.createRepositoryClient(org, name).createPullRequestClient()
   }
+
+  private fun checksClient(repositoryUrl: URI?, githubClient: GitHubClient): ChecksClient =
+    repository(repositoryUrl).let { (org, name) -> githubClient.createChecksClient(org, name) }
+
+  private fun repository(repositoryURI: URI?) =
+    repositoryURI?.path?.let { path ->
+      path.substringAfter("/repos/").split("/").let { (org, name ) -> Repository(org, name)}
+    } ?: throw IllegalStateException("Could not get repository full name from $repositoryURI")
 
   private fun prDescription(it: PullRequest) = "[title: ${it.title()}, url: ${it.htmlUrl()} ]"
 
@@ -179,5 +198,7 @@ class Renovator : CliktCommand() {
   sealed interface Confirmation
   data class Yes(val comment: String) : Confirmation
   object No : Confirmation
+
+  data class Repository(val owner: String, val name: String)
 
 }

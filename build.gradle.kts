@@ -28,7 +28,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
     implementation("com.github.ajalt.clikt:clikt:3.5.2")
 
-    implementation("com.spotify:github-client:0.1.51")
+    implementation("com.spotify:github-client:0.1.57")
 
     implementation("org.slf4j:slf4j-simple:2.0.7")
 }
