@@ -4,7 +4,7 @@
 
 Renovator helps to keep your dependency update PR-s under control.
 
-If you use Renovate or Dependebot, you might have noticed that they create a lot of PR-s.
+If you use Renovate or Dependabot, you might have noticed that they create a lot of PR-s.
 
 Renovator helps to keep them under control by merging them semi-automatically.
 
