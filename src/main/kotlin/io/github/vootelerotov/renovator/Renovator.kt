@@ -96,7 +96,8 @@ class Renovator : CliktCommand() {
 
     if (
       checksClient.getCheckRuns(pr.head()?.ref()).get().checkRuns()
-        .any { it.conclusion().getOrNull() != CheckRunConclusion.success }
+        .mapNotNull { it.conclusion().getOrNull() }
+        .any { it != CheckRunConclusion.success && it != CheckRunConclusion.skipped }
       ) {
       echo("PR ${prDescription(pr)} has non-succeeded checks")
       return
